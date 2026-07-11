@@ -95,7 +95,7 @@ func createDesignateServiceClient() (*gophercloud.ServiceClient, error) {
 	}
 	log.Infof("Using OpenStack Keystone at %s", providerClient.IdentityEndpoint)
 
-	client, err := openstack.NewDNSV2(ctx, providerClient, endpointOptions)
+	client, err := openstack.NewDNSV2(providerClient, endpointOptions)
 	if err != nil {
 		return nil, err
 	}
