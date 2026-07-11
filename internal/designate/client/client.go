@@ -260,7 +260,7 @@ func (c designateClient) DeleteRecordSet(ctx context.Context, zoneID, recordSetI
 
 	log.Debugf("→ Deleting recordset: %s", recordSetID)
 
-	err := recordsets.Delete(ctx, c.serviceClient, zoneID, recordSetID, recordsets.DeleteOpts{AllProjects: c.allProjects}).ExtractErr()
+	err := recordsets.DeleteWithOpts(ctx, c.serviceClient, zoneID, recordSetID, recordsets.DeleteOpts{AllProjects: c.allProjects}).ExtractErr()
 
 	duration := time.Since(startTime)
 	metrics.ApiCallLatency.WithLabelValues("DeleteRecordSet").Observe(duration.Seconds())
