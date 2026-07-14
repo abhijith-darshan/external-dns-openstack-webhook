@@ -107,3 +107,34 @@ jobs:
         run: |
           if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 10 ]; then exit 1; fi
           if [ $(openstack recordset list all -f value | grep -c " A ") -ne 10 ]; then exit 2; fi
+
+      - name: Create cloud_admin project and zone for all-projects test
+        run: |
+          openstack --os-cloud devstack-admin project create cloud_admin
+          CLOUD_ADMIN_PROJECT_ID=$(openstack --os-cloud devstack-admin project show cloud_admin -f value -c id)
+          openstack --os-cloud devstack-admin zone create --email admin@cloud-admin.example.com cloud-admin.example.com. --sudo-project-id $CLOUD_ADMIN_PROJECT_ID
+        shell: bash
+
+      - name: Wait for cloud_admin zone creation
+        run: |
+          while [ "$(openstack --os-cloud devstack-admin zone list --all-projects -f csv | grep PENDING)" != "" ]; do date; openstack --os-cloud devstack-admin zone list --all-projects -f value; sleep 1; done
+
+      - name: Start external-dns-openstack-webhook with --all-projects on port 8889
+        run: |
+          ./build/bin/external-dns-openstack-webhook --all-projects --domain-filter cloud-admin.example.com --webhook-server-address 127.0.0.1:8889 >/tmp/external-dns-openstack-webhook-all-projects.log 2>&1 &
+
+      - name: Run external-dns against cloud_admin project zone
+        run: ./build/external-dns --txt-owner-id my-cluster-id --provider webhook --webhook-provider-url http://127.0.0.1:8889 --source fake --log-level=debug --once 2>&1
+        working-directory: ./external-dns
+
+      - name: Show /tmp/external-dns-openstack-webhook-all-projects.log
+        run: cat /tmp/external-dns-openstack-webhook-all-projects.log
+
+      - name: Wait for all-projects PENDING
+        run: |
+          while [ "$(openstack --os-cloud devstack-admin zone list --all-projects -f csv | grep PENDING)" != "" ]; do date; openstack --os-cloud devstack-admin zone list --all-projects -f value; sleep 1; done
+
+      - name: Check all-projects created entries
+        run: |
+          if [ $(openstack --os-cloud devstack-admin recordset list cloud-admin.example.com. --all-projects -f value | grep -c " TXT ") -ne 10 ]; then exit 1; fi
+          if [ $(openstack --os-cloud devstack-admin recordset list cloud-admin.example.com. --all-projects -f value | grep -c " A ") -ne 10 ]; then exit 2; fi
