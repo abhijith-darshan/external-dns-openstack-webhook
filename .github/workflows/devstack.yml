@@ -70,6 +70,18 @@ jobs:
         run: ./stack.sh
         working-directory: ./devstack
 
+      - name: Fix Designate root_helper (use absolute path to designate-rootwrap)
+        # The designate-worker invokes its bind9 backend via
+        # `sudo designate-rootwrap ...`, but designate-rootwrap lives in the
+        # devstack venv (/opt/stack/data/venv/bin) which is not in sudo's
+        # secure_path -> "sudo: designate-rootwrap: command not found" -> zones
+        # go PENDING then ERROR. Rewrite root_helper to the absolute path, the
+        # same way devstack already does for neutron-rootwrap.
+        run: |
+          sudo sed -i 's#sudo designate-rootwrap#sudo /opt/stack/data/venv/bin/designate-rootwrap#g' /etc/designate/designate.conf
+          grep -n "root_helper" /etc/designate/designate.conf || true
+        shell: bash
+
       - name: Restart Designate
         run: sudo systemctl restart "devstack@designate-*.service"
 
