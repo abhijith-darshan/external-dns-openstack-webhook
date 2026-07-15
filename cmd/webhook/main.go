@@ -16,13 +16,19 @@ import (
 )
 
 const (
-	webhookServerAddr = "127.0.0.1:8888"
-	statusServerAddr  = "0.0.0.0:8080"
+	defaultWebhookServerAddr = "127.0.0.1:8888"
+	defaultStatusServerAddr  = "0.0.0.0:8080"
 )
 
 func main() {
 	var domainFilters []string
+	var allProjects bool
+	var webhookServerAddr string
+	var statusServerAddr string
 	pflag.StringArrayVar(&domainFilters, "domain-filter", []string{}, "List of domains to work on (can be specified multiple times)")
+	pflag.BoolVar(&allProjects, "all-projects", false, "Manage all zones and recordsets regardless of the project the service user resides in (requires an admin or appropriately scoped token)")
+	pflag.StringVar(&webhookServerAddr, "webhook-server-address", defaultWebhookServerAddr, "Address to bind the webhook server to")
+	pflag.StringVar(&statusServerAddr, "status-server-address", defaultStatusServerAddr, "Address to bind the status and metrics server to")
 	pflag.Parse()
 
 	log.SetLevel(log.DebugLevel)
@@ -61,7 +67,7 @@ func main() {
 	}()
 
 	epf := endpoint.NewDomainFilter(domainFilters)
-	dp, err := provider.NewDesignateProvider(*epf, false)
+	dp, err := provider.NewDesignateProvider(*epf, allProjects, false)
 	if err != nil {
 		log.Fatalf("NewDesignateProvider: %v", err)
 		metrics.OpenstackConnectionMetric.Set(0)
