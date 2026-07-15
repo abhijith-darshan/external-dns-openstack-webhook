@@ -140,6 +140,7 @@ jobs:
       - name: Start external-dns-openstack-webhook as cloud_admin with --all-projects on port 8889
         run: |
           OS_CLOUD=devstack-cloud-admin ./build/bin/external-dns-openstack-webhook --all-projects --domain-filter example.com --webhook-server-address 127.0.0.1:8889 >/tmp/external-dns-openstack-webhook-all-projects.log 2>&1 &
+          while ! curl -sf http://127.0.0.1:8889 > /dev/null 2>&1; do sleep 1; done
 
       - name: Run external-dns against example.com as cloud_admin project user
         run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --webhook-provider-url http://127.0.0.1:8889 --source fake --log-level=debug --once 2>&1
