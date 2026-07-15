@@ -70,7 +70,7 @@ jobs:
         run: ./stack.sh
         working-directory: ./devstack
 
-      - name: Fix Designate root_helper (use absolute path to designate-rootwrap)
+      - name: Fix Designate root_helper
         # root_helper defaults to "sudo designate-rootwrap ..." in designate/conf/base.py.
         # designate-rootwrap lives in the devstack venv (/opt/stack/data/venv/bin) which
         # is not in sudo's secure_path -> every rndc addzone fails -> zones PENDING->ERROR.
