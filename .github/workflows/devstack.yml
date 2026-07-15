@@ -78,7 +78,6 @@ jobs:
         run: |
           sudo sed -i '/^\[DEFAULT\]/a root_helper = sudo /opt/stack/data/venv/bin/designate-rootwrap /etc/designate/rootwrap.conf' \
             /etc/designate/designate.conf
-          grep -n "root_helper" /etc/designate/designate.conf
         shell: bash
 
       - name: Restart Designate
@@ -92,56 +91,32 @@ jobs:
         run: |
           while [ "$(openstack zone list -f value | grep PENDING)" != "" ]; do date; openstack zone list -f value; sleep 1; done
 
-      - name: Diagnose zone provisioning (bind9 / worker)
-        if: always()
+      - name: Start external-dns-openstack-webhook in background
         run: |
-          echo "===== zone list ====="
-          openstack zone list -f value || true
-          echo "===== designate-worker journal ====="
-          sudo journalctl -u "devstack@designate-worker.service" --no-pager -n 200 || true
-          echo "===== designate-central journal ====="
-          sudo journalctl -u "devstack@designate-central.service" --no-pager -n 100 || true
-          echo "===== designate-mdns journal ====="
-          sudo journalctl -u "devstack@designate-mdns.service" --no-pager -n 80 || true
-          echo "===== named / bind9 status ====="
-          sudo systemctl status bind9 named 2>/dev/null || true
-          sudo journalctl -u bind9 -u named --no-pager -n 100 || true
-          echo "===== listeners on 53 / 953 (rndc) ====="
-          sudo ss -tulpn | grep -E ':53 |:953 ' || true
-          echo "===== rndc status ====="
-          sudo rndc -c /etc/bind/rndc.conf status || true
-          echo "===== designate pools.yaml ====="
-          sudo cat /etc/designate/pools.yaml || true
-        shell: bash
+          ./build/bin/external-dns-openstack-webhook >/tmp/external-dns-openstack-webhook.log 2>&1 &
 
-      # TEMPORARILY COMMENTED OUT to speed up iteration on the all-projects test below.
-      # RESTORE before pushing the final PR.
-      # - name: Start external-dns-openstack-webhook in background
-      #   run: |
-      #     ./build/bin/external-dns-openstack-webhook >/tmp/external-dns-openstack-webhook.log 2>&1 &
-      #
-      # - name: Run external-dns
-      #   run: ./build/external-dns --txt-owner-id my-cluster-id --provider webhook --source fake --log-level=debug --once 2>&1
-      #   working-directory: ./external-dns
-      #
-      # - name: Show /tmp/external-dns-openstack-webhook.log
-      #   run: cat /tmp/external-dns-openstack-webhook.log
-      #
-      # - name: Wait for PENDING
-      #   run: |
-      #     while [ "$(openstack zone list -f csv | grep PENDING)" != "" ]; do date; openstack zone list -f value; sleep 1; done
-      #
-      # - name: Show created entries
-      #   run: |
-      #     echo "Zones:"
-      #     openstack zone list -f value
-      #     echo "Recordsets:"
-      #     openstack recordset list all -f value
-      #
-      # - name: Check created entries
-      #   run: |
-      #     if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 10 ]; then exit 1; fi
-      #     if [ $(openstack recordset list all -f value | grep -c " A ") -ne 10 ]; then exit 2; fi
+      - name: Run external-dns
+        run: ./build/external-dns --txt-owner-id my-cluster-id --provider webhook --source fake --log-level=debug --once 2>&1
+        working-directory: ./external-dns
+
+      - name: Show /tmp/external-dns-openstack-webhook.log
+        run: cat /tmp/external-dns-openstack-webhook.log
+
+      - name: Wait for PENDING
+        run: |
+          while [ "$(openstack zone list -f value | grep PENDING)" != "" ]; do date; openstack zone list -f value; sleep 1; done
+
+      - name: Show created entries
+        run: |
+          echo "Zones:"
+          openstack zone list -f value
+          echo "Recordsets:"
+          openstack recordset list all -f value
+
+      - name: Check created entries
+        run: |
+          if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 10 ]; then exit 1; fi
+          if [ $(openstack recordset list all -f value | grep -c " A ") -ne 10 ]; then exit 2; fi
 
       - name: Create cloud_admin project and grant admin access
         run: |
