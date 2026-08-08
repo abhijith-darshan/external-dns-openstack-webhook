@@ -152,7 +152,7 @@ jobs:
           curl -sf http://127.0.0.1:8889 > /dev/null || { cat /tmp/external-dns-openstack-webhook-all-projects.log; exit 1; }
 
       - name: Run external-dns against all-projects.com as cloud_admin project user
-        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --webhook-provider-url http://127.0.0.1:8889 --source fake --log-level=debug --once 2>&1
+        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --webhook-provider-url http://127.0.0.1:8889 --source fake --fqdn-template=all-projects.com --log-level=debug --once 2>&1
         working-directory: ./external-dns
 
       - name: Show /tmp/external-dns-openstack-webhook-all-projects.log
