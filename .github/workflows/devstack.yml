@@ -137,27 +137,27 @@ jobs:
             --os-project-name cloud_admin
         shell: bash
 
-      - name: Create zone all-projects.com owned by demo project
+      - name: Create zone all-projects.test owned by demo project
         run: |
-          openstack zone create --email admin@example.com all-projects.com.
+          openstack zone create --email admin@example.com all-projects.test.
 
-      - name: Wait for all-projects.com zone creation
+      - name: Wait for all-projects.test zone creation
         run: |
           while [ "$(openstack zone list -f value --status PENDING)" != "" ]; do date; openstack zone list -f value; sleep 1; done
 
       - name: Start external-dns-openstack-webhook as cloud_admin with --all-projects on port 8889
         run: |
-          OS_CLOUD=devstack-cloud-admin ./build/bin/external-dns-openstack-webhook --all-projects --domain-filter all-projects.com --webhook-server-address 127.0.0.1:8889 --status-server-address 0.0.0.0:8081 >/tmp/external-dns-openstack-webhook-all-projects.log 2>&1 &
+          OS_CLOUD=devstack-cloud-admin ./build/bin/external-dns-openstack-webhook --all-projects --domain-filter all-projects.test --webhook-server-address 127.0.0.1:8889 --status-server-address 0.0.0.0:8081 >/tmp/external-dns-openstack-webhook-all-projects.log 2>&1 &
           for i in $(seq 30); do curl -sf http://127.0.0.1:8889 > /dev/null 2>&1 && break; sleep 1; done
           curl -sf http://127.0.0.1:8889 > /dev/null || { cat /tmp/external-dns-openstack-webhook-all-projects.log; exit 1; }
 
-      - name: Run external-dns against all-projects.com as cloud_admin project user
-        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --webhook-provider-url http://127.0.0.1:8889 --source fake --fqdn-template=all-projects.com --log-level=debug --once 2>&1
+      - name: Run external-dns against all-projects.test as cloud_admin project user
+        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --webhook-provider-url http://127.0.0.1:8889 --source fake --fqdn-template=all-projects.test --log-level=debug --once 2>&1
         working-directory: ./external-dns
 
       - name: Show /tmp/external-dns-openstack-webhook-all-projects.log
         run: cat /tmp/external-dns-openstack-webhook-all-projects.log
 
-      - name: Check all-projects created entries in all-projects.com
+      - name: Check all-projects created entries in all-projects.test
         run: |
-          if [ $(openstack --os-cloud devstack-admin recordset list all-projects.com. --all-projects -f value | grep -c "all-projects-cluster-id") -ne 10 ]; then exit 1; fi
+          if [ $(openstack --os-cloud devstack-admin recordset list all-projects.test. --all-projects -f value | grep -c "all-projects-cluster-id") -ne 10 ]; then exit 1; fi
