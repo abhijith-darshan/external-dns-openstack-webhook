@@ -118,41 +118,25 @@ jobs:
           if [ $(openstack recordset list all -f value | grep -c " TXT ") -ne 10 ]; then exit 1; fi
           if [ $(openstack recordset list all -f value | grep -c " A ") -ne 10 ]; then exit 2; fi
 
-      - name: Create cloud_admin project and grant admin access
+      - name: Create zone all-projects.test in alt_demo project
         run: |
-          openstack --os-cloud devstack-admin project create cloud_admin
-          openstack --os-cloud devstack-admin role add --project cloud_admin --user admin admin
-        shell: bash
-
-      - name: Add devstack-cloud-admin cloud entry (admin user scoped to cloud_admin project)
-        run: |
-          AUTH_URL=$(python3 -c "import yaml; print(yaml.safe_load(open('/etc/openstack/clouds.yaml'))['clouds']['devstack-admin']['auth']['auth_url'])")
-          ./devstack/tools/update_clouds_yaml.py \
-            --file /etc/openstack/clouds.yaml \
-            --os-cloud devstack-cloud-admin \
-            --os-region-name RegionOne \
-            --os-auth-url "$AUTH_URL" \
-            --os-username admin \
-            --os-password secret \
-            --os-project-name cloud_admin
-        shell: bash
-
-      - name: Create zone all-projects.test owned by demo project
-        run: |
-          openstack zone create --email admin@example.com all-projects.test.
+          openstack --os-cloud devstack-alt zone create --email admin@example.com all-projects.test.
 
       - name: Wait for all-projects.test zone creation
         run: |
-          while [ "$(openstack zone list -f value --status PENDING)" != "" ]; do date; openstack zone list -f value; sleep 1; done
+          while [ "$(openstack --os-cloud devstack-admin zone list -f value --status PENDING --all-projects)" != "" ]; do date; openstack --os-cloud devstack-admin zone list -f value --all-projects; sleep 1; done
 
-      - name: Start external-dns-openstack-webhook as cloud_admin with --all-projects on port 8889
+      - name: Kill external-dns-openstack-webhook
+        run: pkill -f external-dns-openstack-webhook || true
+
+      - name: Start external-dns-openstack-webhook as admin with --all-projects
         run: |
-          OS_CLOUD=devstack-cloud-admin ./build/bin/external-dns-openstack-webhook --all-projects --domain-filter all-projects.test --webhook-server-address 127.0.0.1:8889 --status-server-address 0.0.0.0:8081 >/tmp/external-dns-openstack-webhook-all-projects.log 2>&1 &
-          for i in $(seq 30); do curl -sf http://127.0.0.1:8889 > /dev/null 2>&1 && break; sleep 1; done
-          curl -sf http://127.0.0.1:8889 > /dev/null || { cat /tmp/external-dns-openstack-webhook-all-projects.log; exit 1; }
+          OS_CLOUD=devstack-admin ./build/bin/external-dns-openstack-webhook --all-projects --domain-filter all-projects.test >/tmp/external-dns-openstack-webhook-all-projects.log 2>&1 &
+          for i in $(seq 30); do curl -sf http://127.0.0.1:8888 > /dev/null 2>&1 && break; sleep 1; done
+          curl -sf http://127.0.0.1:8888 > /dev/null || { cat /tmp/external-dns-openstack-webhook-all-projects.log; exit 1; }
 
-      - name: Run external-dns against all-projects.test as cloud_admin project user
-        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --webhook-provider-url http://127.0.0.1:8889 --source fake --fqdn-template=all-projects.test --log-level=debug --once 2>&1
+      - name: Run external-dns against all-projects.test as admin user
+        run: ./build/external-dns --txt-owner-id all-projects-cluster-id --provider webhook --source fake --fqdn-template=all-projects.test --log-level=debug --once 2>&1
         working-directory: ./external-dns
 
       - name: Show /tmp/external-dns-openstack-webhook-all-projects.log
